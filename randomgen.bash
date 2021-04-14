@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 #- Description: Bash script that generates a sequence of random numbers from 1 to 10
+# NOT FINALIZED; Requires tweaking to properly function, but layout is defined; needs certain implementations and it works just fine
 
 args=$@
 
 #- Setting verbose to 0 will have additional info of when the message was printed or show the randomize approach
-verbose=0
+verbose=1
 
 # Set to 0 if you want shell debugging turned on
 debug=0
@@ -17,20 +18,63 @@ check_bins() {
 
 local _method=$1
 
+#declare -A _methods_dict
+#local _app_methods=( "demo" "variable" "dev" "shuffle" "self" )
+
+#for m in ${_app_methods[@]};
+#do
+#	declare _methods_dict[$m]
+#done
+
+
+# Method 1 requirements
+local _m1_r=1
+# Method 2 requirements
+local _m2_rcount=3
+local _m2_rname=( "grep" "sed" "head" )
+# Method 3 requirements
+local _m3_r=1
+local _m3_rname=( "shuf" )
+# Method 4 requirements
+local _m4_r=1
+local _m4_rname=( "date" )
+
+# total requirements 5; for demo to function at least 1 of the above must be satisfied
+local _method_requirements=(
+"$method1_requirements" \
+"${method2_requirements[@]}" \
+"$method3_requirements")
 
 #- Will check for all binaries
-if [[ -z ${_method} ]];
+if [[ "${_method,,}" == "demo" ]];
 	then
-		_grep=$(which grep)
-		_sed=$(which sed)
-		_head=$(which head)
-		_shuf=$(which shuf)
+		local _m2_rt=0
+		for m2r in ${_m2_rname[@]};
+		do
+			#declare "_${m2r}"
+			"_${m2r}"=$(which ${m2r} 2>/dev/null)
+			if [[ -z ${_m2r} ]];
+				then
+					local _m2_rt+=$(( _m2_rt + 1 ))
+					echo "Current value of m2rt is ${_m2_rt}"
+			fi
+			if [[ ${_m2r} -eq $_m2_rcount ]];
+				then
+					echo "All requirements met for Method 2: ${_m2r} results were found"
+			fi
+		done
+		_grep=$(which grep 2>/dev/null)
+		_sed=$(which sed 2>/dev/null)
+		_head=$(which head 2>/dev/null)
+		_shuf=$(which shuf 2>/dev/null)
+		_nope=$(which nope 2>/dev/null)
+		_random=$RANDOM
 elif [[ "${_method,,}" == "variable" ]];
 	then
 		_random=$RANDOM
 		if [[ -z ${_random} ]];
 			then
-				echo "The selected method is not supported. The system does not have the '$RANDOM' variable set"
+				echo "The selected method is not supported. The system does not have the 'RANDOM' variable set"
 				exit 2
 		fi
 elif [[ "${_method,,}" == "dev" ]];
@@ -39,53 +83,61 @@ elif [[ "${_method,,}" == "dev" ]];
 			then
 				echo "The selected method is not supported. The file /dev/urandom does not exist on the system."
 				exit 2
+			else
+				_grep=$(which grep 2>/dev/null)
+				_sed=$(which sed 2>/dev/null)
+				_head=$(which head 2>/dev/null)
 		fi
 elif [[ "${_method,,}" == "shuffle" ]];
 	then
 		_shuf=$(which shuf)
-		local random_nr=$(${_shuf} -i1-10 -n1)
 		echo $random_nr
 elif [[ "${_method,,}" == "self" ]];
 	then
-
-
-}
-
-
-method_selector() {
-
-#- Test if each tool for the generation is available
-#- The function will decide which is to be used automatically if no argument is supplied in the order: Method 1, Method 2, Method 3, Method 4
-
-# Method 1 for Linux -> $RANDOM variable if set (will generate a number from 0-32767)
-# Value will be used to be parsed into a random 1-10. This method has certain security implications as the pattern can be detected eventually
-
-if [[ -n $RANDOM ]];
-    then
-        echo "Random exists"
-    else
-        echo "Random does not exist"
+		echo "self method opted"
 fi
 
-# there are 3 methods
+}
+
+#- Select and test the requirements for one of the 4 methods
+method_selector() {
 
 
-random_method1
-random_method2
-random_method3 #which is in main
+#- Requires a method argument. Accepted values are demo, variable, dev, shuffle, self
+#- If no argument is supplied, the app will default to 'demo'
+#- Needs to run only once, it's redundant to loop it
+check_bins "$method"
+
+
+if [[ ${method} == "demo" ]];
+	then
+		for m in $(seq 1 1 4);
+		do
+			random_method$m
+		done
+elif [[ ${method} == "variable" ]];
+	then
+		random_method1
+elif [[ ${method} == "dev" ]];
+	then
+		random_method2
+elif [[ ${method} == "shuffle" ]];
+	then
+		random_method3
+elif [[ ${method} == "self" ]];
+	then
+		random_method4
+fi
 
 
 }
 
+#- Using the $RANDOM variable
 random_method1() {
 
 
-if [[ -n $RANDOM ]];
-    then
-        echo "Random exists"
-    else
-        echo "Random does not exist"
-fi
+local random_nr=$(( ( RANDOM % 10 )  + 1 ))
+echo "The number generated through the 'RANDOM' method is $random_nr"
 
 }
 
@@ -94,15 +146,15 @@ random_method2() {
 
 
 local random_nr=$(${_grep} -m1 -ao '[0-9]' /dev/urandom | ${_sed} s/0/10/ | ${head} -n1)
-echo $random_nr
+echo "The random number generated through the /dev/random approach is $random_nr"
 
 }
 
 #- Using the shuf utility
 random_method3() {
 
-local random_nr=$(shuf -i1-10 -n1)
-echo $random_nr
+local random_nr=$(${_shuf} -i1-10 -n1)
+echo "The random number generated through the shuf utility is $random_nr"
 
 
 }
@@ -111,18 +163,15 @@ echo $random_nr
 random_method4() {
 
 local sequence=$(date +%N )
-local number=${sequence:0:1}
+local random_nr=${sequence:0:1}
 	
-	#if [[ ${#number} -gt 1 ]];
-	#	then
-	#		if [[ $verbose -eq 0 ]]; then echo "$(date +%c) :Since the number has ${#number} digits, we will substract by 1"; fi	
-	#		number=$((number - 1 ))
-	if [[ $number -eq 0 ]];
-		then
-			if [[ $verbose -eq 0 ]]; then echo "$(date +%c) :Since the number is $number, we will add by 1"; fi
-			number=$((number + 1 ))
-	fi
-	
+
+if [[ $number -eq 0 ]];
+	then
+		if [[ $verbose -eq 0 ]]; then echo "$(date +%c) :Since the number is $number, we will add by 1"; fi
+		number=$((number + 1 ))
+fi
+echo "The random number generated by the self built method is $random_nr"
 
 
 }
@@ -135,12 +184,15 @@ if [[ $debug -eq 0 ]];
 fi
 
 
+#- Prints the app usage
 usage() {
 
 echo "Usage: $0 args"
 echo "Available arguments:"
 echo "-v | --verbose to print out timestamps along with the random  number"
 echo "-i | -i=value | --interval=value to specify the loop interval. Specify the values in int+(s,m)"
+echo "-d | --demo will apply each random generator method one by one."
+echo "-h,u | --help,usage will print this message"
 echo "Default interval is 0.5s, and possible values are 1s, 2m"
 echo "If another format is provided, the script will enforce the defaults"
 
@@ -148,146 +200,92 @@ echo "If another format is provided, the script will enforce the defaults"
 
 
 #- Set the default interval or user input value
-parse_interval() {
+parse_value() {
 
-local value="$1"
+local type="$1"
+local value="$2"
 
 
-if [[  "$value" =~ ^[0-9]{1,}[sSmM]{1} ]]; 
+if [[ ${type} == "interval" ]];
 	then
-		# Return the default 0.5s
-		echo $interval
-	else
-		# Return the user input value
-		echo $value
+		if [[  "$value" =~ ^[0-9]{1,}[sSmM]{1} ]]; 
+			then
+				# Return the default 0.5s
+				echo $interval
+			else
+				# Return the user input value
+				echo $value
+		fi
+elif [[ ${type,,} == "method" ]];
+	then
+		# variable, dev, shuffle, self
+		if [[ $value =~ ^(variable|dev|shuffle|self)$ ]];
+			then
+				echo $value
+			else
+				echo "demo"
+		fi
 fi
 		
 }
-
-#- If there are any args at exec time, parse them
-parse_args() {
-
-
-
-if [[ -z $@ ]];
-	then
-		interval=0.5s
-	else
-		# As long as there is at least one more argument, keep looping
-		while [[ $# -gt 0 ]]; 
-		do
-			arg="$1"
-			case "$arg" in
-				# This is a flag type option. Will catch either -v or --verbose
-				-v|--verbose)
-				verbose=0
-				;;
-				# This is an arg=value type option. Will catch -o=value or --output-file=value
-				-i=*|--interval=*)
-				
-				interval=$(parse_interval "${arg#*=}")
-				if [[  "${arg#*=}" =~ ^[0-9]{1,}[sSmM]{1} ]]; 
-					then 
-						echo ""${arg#*=}" does not match the expected format. Setting the default value of $interval."
-					else
-						interval="${arg#*=}"
-				fi
-
-				;;
-				# This is an arg value type option. Will catch -o value or --output-file value
-				-i|--interval)
-				shift
-				interval="$1"
-				;;
-				*)
-			echo "Unknown argument $arg provided"
-			usage
-			;;
-			esac
-			# Shift after checking all the cases to get the next option
-			shift
-		done
-fi
-
-
-}
-
 
 
 main() {
 
 echo "args are "$args" and in total are ${#args}"
-#- Parse the arguments, no type checking
-#parse_args $@
 
-if [[ -z $args ]];
+#- Parse the arguments, no type checking
+#parse_args "$args"
+
+local argss=$@
+
+if [[ -z $argss ]];
 	then
 		interval=0.5s
+		demo=0
+		verbose=0
+		method="demo"
 	else
-		# As long as there is at least one more argument, keep looping
-		while [[ $# -gt 0 ]]; 
+		for par in "${argss[@]}"; 
 		do
-			arg="$1"
-			case "$arg" in
-				# This is a flag type option. Will catch either -v or --verbose
+			case $par in
+			
 				-v|--verbose)
 				verbose=0
+				#shift
+				;;	
+				-i=*|--interval=*)
+				#- Will verify if it matches the start with digit end with 1 sSmM rule, otherwise set default
+				interval=$(parse_value interval "${par#*=}")
+				#shift
 				;;
-				# This is a flag type option. Will catch either -v or --verbose
+				# variable, dev, shuffle, self
+				-m=*|--method=*)
+				method=$(parse_value method "${par#*=}")		
+				#shift
+				;;
 				-d|--demo)
 				demo=0
+				#shift
 				;;
-				# This is an arg=value type option. Will catch -o=value or --output-file=value
-				-i=*|--interval=*)
-				
-				interval=$(parse_interval "${arg#*=}")
-				if [[  "${arg#*=}" =~ ^[0-9]{1,}[sSmM]{1} ]]; 
-					then 
-						echo ""${arg#*=}" does not match the expected format. Setting the default value of $interval."
-					else
-						interval="${arg#*=}"
-				fi
-
-				;;
-				# This is an arg value type option. Will catch -o value or --output-file value
-				-i|--interval)
-				shift
-				interval="$1"
+				-h|--help|-u|--usage)
+				usage
+				exit 0
 				;;
 				*)
-			echo "Unknown argument $arg provided"
-			usage
-			;;
+				echo "Unknown argument $par provided"
+				usage
+				exit 3
+				;;
 			esac
-			# Shift after checking all the cases to get the next option
-			shift
 		done
-		if [[ -z $interval ]]; then interval=0.5s; fi
 fi
 
 while true;
 do
 	sleep $interval
-	local sequence=$(date +%N )
-	local number=${sequence:0:1}
-	
-	#if [[ ${#number} -gt 1 ]];
-	#	then
-	#		if [[ $verbose -eq 0 ]]; then echo "$(date +%c) :Since the number has ${#number} digits, we will substract by 1"; fi	
-	#		number=$((number - 1 ))
-	if [[ $number -eq 0 ]];
-		then
-			if [[ $verbose -eq 0 ]]; then echo "$(date +%c) :Since the number is $number, we will add by 1"; fi
-			number=$((number + 1 ))
-	fi
-	
-	if [[ $verbose -eq 0 ]];
-		then		
-			
-			echo "$(date +%c) : The random number from 1-10: $number from the sequence $sequence"
-		else
-			echo "The random number from 1-10 is: $number"
-	fi
+	#- Select and run one of the 4 methods
+	method_selector
 done
 
 }
